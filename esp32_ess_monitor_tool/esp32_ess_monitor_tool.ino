@@ -1,6 +1,7 @@
 #include <EEManager.h>
 #include <U8g2lib.h>
 #include <GyverPortal.h>
+#include <FastBot.h>
 #include <SPI.h>
 #include <mcp_can.h>
 
@@ -44,14 +45,23 @@ double drated_voltage, dbatt_voltage, dbatt_temp, dbatt_current;
 int drated_current1,drated_current2;
 unsigned long online,previousMillis;
 const long interval = 1000;
+bool needsReset,needsInit;
 
+//TelegramBot Stuff
+#define BOT_TOKEN ""
+#define CHAT_ID ""
+FastBot bot(BOT_TOKEN);
+bool full_charge_state;
+bool no_can;
+bool deep_discharge_detected;
+volatile unsigned int can_alive;
+const int can_threshold = 20;
 unsigned long previousMillis2;
 const long interval2 = 60000;
 
-bool needsReset,needsInit;
-
 bool charge_allowed,discharge_allowed,gofull; 
 int count_seconds = 36;
+
 //Web Interface
 #define GP_NO_OTA           
 #define GP_NO_UPLOAD        
@@ -109,14 +119,14 @@ void build() {
   
   GP.BREAK();
   GP.BREAK();
-  GP.LABEL("Максимальний % заряду"); 
-  GP.SLIDER("target_charge", data.target_chrg, 0, 100); 
-  GP.SPAN("Після досягнення заданого проценту заряду або вище. Запит на заряд до інвертера передаватися перестане");    
+  GP.LABEL("Максимальний рівень заряду %"); 
+  GP.SLIDER("target_charge", data.target_chrg, 51, 100); 
+  GP.SPAN("Після досягнення заданого проценту заряду або вище. Дозвіл на заряд до інвертера передаватися перестане");    
   GP.BREAK();
   GP.BREAK();
-  GP.LABEL("Дозволений % розряду");
-  GP.SLIDER("target_discharge", data.target_dischrg, 0, 100); 
-  GP.SPAN("Після досягнення заданого проценту заряду або нижче. Дозвіл на подальший рорзряд батареї передаватися перестане");    
+  GP.LABEL("Дозволений рівень розряду %");
+  GP.SLIDER("target_discharge", data.target_dischrg, 0, 50); 
+  GP.SPAN("Після досягнення заданого проценту заряду або нижче. Дозвіл на подальший  рорзряд батареї передаватися перестане");    
   GP.BREAK();
   GP.BREAK();
   GP.HR();
@@ -129,7 +139,7 @@ void build() {
   GP.BREAK();
   GP.HR();
   GP.PLAIN("Повний заряд рекомендується проводити тіьки від мережі 220V", "", GP_YELLOW);
-  GP.PLAIN("Цей режим потрібно виключно для балансування батарей.", "", GP_YELLOW);
+  GP.PLAIN("Цей режим потрібен виключно для балансування батарей.", "", GP_YELLOW);
   GP.HR();
 
   GP.NAV_BLOCK_END();
@@ -195,8 +205,6 @@ void web_action() {
 }
 
 // Init CAN
-
-
 MCP_CAN CAN0(5);
 #define CAN0_INT 15
 long unsigned int rxId;
@@ -218,7 +226,6 @@ void setup()
   portal.attachBuild(build);
   portal.attach(web_action);
   portal.start();
-
 }
 
 void countDownHour(){
@@ -265,13 +272,58 @@ void loop()
 
     online = esp_timer_get_time() / 1000000;
     esponline_str = String(online) + " секунд";
- 
+    can_alive++;
   }
 
   mcp_read();
   portal.tick();
   if (needsInit){Serial.println("Got EEPROM Erase Signal");needsInit = false;memory.reset();ESP.restart();} //Reset
   if (memory.tick()){if (needsReset){ESP.restart();}} //Save & Restart
+
+  unsigned long currentMillis2 = millis();
+  //Telegram Notification Section
+  if (currentMillis2 - previousMillis2 >= interval2) {
+    previousMillis2 = currentMillis2;
+    bot.setChatID(CHAT_ID);
+
+    if (rated_current1 == 0 && batt_charge == 100 && full_charge_state == 0){
+      //Battery Full Message
+      full_charge_state = 1;
+      Serial.println("BATTERY FULL CHARGE!");
+      bot.sendMessage("Наша Батарка залита на сотку!");
+    }
+    if (dbatt_current < 0 && batt_charge < 40 && deep_discharge_detected == 0){
+      //Battery Discharging Message
+      deep_discharge_detected = 1;
+      Serial.println("BATTERY DEEP DISCHARGE!");
+      bot.sendMessage("Наша Батарка скоро всьо. Залишилось менше 40%. Збирайте Чумуйдани");
+    }
+    if (batt_charge > 45){
+      deep_discharge_detected = 0;
+    }
+    if (can_alive > can_threshold){
+      if (no_can == 0){
+        //Battery No Data Message
+        no_can = 1;
+        Serial.println("NO DATA FROM BATTERY!");
+        bot.sendMessage("Наша Батарка відвалилась!");
+      }
+    } else {
+      no_can = 0;
+      Serial.println("CAN Connection to BATTERY! restored");
+      bot.sendMessage("Наша Батарка знайшлася!");
+    }
+    if (batt_charge < 98 && no_can == 0){
+      full_charge_state = 0;
+      Serial.println("BATTERY DISCHARGE DETECTED!");
+      bot.sendMessage("Наша Батарка почала розряджатися!");
+    }
+  }
+}
+
+void mcp_int(){  //Function to track that battery is alive and well
+can_alive = 0;
+mcp_read();
 }
 
 void mcp_read(){
@@ -288,7 +340,7 @@ byte f305[8] = {0x21, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; //keep alive
 byte f35a[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; //no idea
 byte f35c[8]; //Charge Restrictions for Deye Inverter
 
-byte f379[8] = {0x00, 0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // One Battery
+byte f379[8] = {0x7e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; // One Battery
 
 byte genChargeFrame(){
   if (rated_current1 != 0){ //battery allows charging
@@ -439,7 +491,7 @@ void mcp_can_init(){
   if(CAN0.begin(MCP_ANY, CAN_500KBPS, MCP_8MHZ) == CAN_OK) { Serial.println("MCP2515 Initialized Successfully!");}  
   else Serial.println("Error Initializing MCP2515...");
   CAN0.setMode(MCP_NORMAL);
-  attachInterrupt(CAN0_INT, mcp_read, LOW);
+  attachInterrupt(CAN0_INT, mcp_int, LOW);
   pinMode(CAN0_INT, INPUT);
 }
 
@@ -485,7 +537,7 @@ void initEEPROM(){
       break;
     case 1:
       Serial.println("Init Done");
-      data.target_chrg = 30;
+      data.target_chrg = 97;
       data.target_dischrg = 5;
       data.full_charge_time = 0;
       break;
