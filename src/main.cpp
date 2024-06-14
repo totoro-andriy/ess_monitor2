@@ -9,14 +9,13 @@
 #define DEBUG 0
 #define PROTECTED 0
 
-void build();
+void build() ;
 void web_action();
 void countDownHour();
 void mcp_read();
-byte genChargeFrame();
+byte genChargeFrame ();
 void mcp_send();
-void ProcessData(uint32_t cid, int d0, int d1, int d2, int d3, int d4, int d5,
-                 int d6, int d7);
+void ProcessData(uint32_t cid, int d0, int d1, int d2, int d3, int d4, int d5,   int d6, int d7);
 void PrintData();
 void draw();
 void checkmac();
