@@ -4,8 +4,8 @@ on: [push]
 
 jobs:
   build:
+    name: Build
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
@@ -19,6 +19,9 @@ jobs:
           python-version: '3.12'
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
-
+      - name: clang-format lint
+        uses: DoozyX/clang-format-lint-action@v0.17
+        with:
+          source: src
       - name: Build PlatformIO Project
         run: pio run
