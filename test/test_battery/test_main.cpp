@@ -5,28 +5,28 @@ TEST(GetChargeControlByte, ChargeBit) {
   const uint8_t mask = 1 << 7;
   BatteryState b;
 
-  b = {.ratedChargeCurrent = 0, .charge = 0};
+  b = {.charge = 0, .ratedChargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedChargeCurrent = 0, .charge = 98};
+  b = {.charge = 98, .ratedChargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedChargeCurrent = 0, .charge = 99};
+  b = {.charge = 99, .ratedChargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedChargeCurrent = 0, .charge = 100};
+  b = {.charge = 100, .ratedChargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedChargeCurrent = 10, .charge = 0};
+  b = {.charge = 0, .ratedChargeCurrent = 10};
   EXPECT_TRUE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedChargeCurrent = 10, .charge = 98};
+  b = {.charge = 98, .ratedChargeCurrent = 10};
   EXPECT_TRUE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedChargeCurrent = 10, .charge = 99};
+  b = {.charge = 99, .ratedChargeCurrent = 10};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedChargeCurrent = 10, .charge = 100};
+  b = {.charge = 100, .ratedChargeCurrent = 10};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 }
 
@@ -34,28 +34,28 @@ TEST(GetChargeControlByte, DischargeBit) {
   const uint8_t mask = 1 << 6;
   BatteryState b;
 
-  b = {.ratedDischargeCurrent = 0, .charge = 0};
+  b = {.charge = 0, .ratedDischargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedDischargeCurrent = 0, .charge = 29};
+  b = {.charge = 29, .ratedDischargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedDischargeCurrent = 0, .charge = 30};
+  b = {.charge = 30, .ratedDischargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedDischargeCurrent = 0, .charge = 100};
+  b = {.charge = 100, .ratedDischargeCurrent = 0};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedDischargeCurrent = 10, .charge = 0};
+  b = {.charge = 0, .ratedDischargeCurrent = 10};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedDischargeCurrent = 10, .charge = 29};
+  b = {.charge = 29, .ratedDischargeCurrent = 10};
   EXPECT_FALSE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedDischargeCurrent = 10, .charge = 30};
+  b = {.charge = 30, .ratedDischargeCurrent = 10};
   EXPECT_TRUE(getChargeControlByte(&b) & mask);
 
-  b = {.ratedDischargeCurrent = 10, .charge = 100};
+  b = {.charge = 100, .ratedDischargeCurrent = 10};
   EXPECT_TRUE(getChargeControlByte(&b) & mask);
 }
 
