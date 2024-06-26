@@ -19,7 +19,7 @@ void buildPortal();
 void onPortalUpdate();
 
 void begin(uint8_t core, uint8_t priority) {
-  xTaskCreatePinnedToCore(task, "web_task", 8000, NULL, priority, NULL, core);
+  xTaskCreatePinnedToCore(task, "web_task", 20000, NULL, priority, NULL, core);
 }
 
 void task(void *pvParameters) {

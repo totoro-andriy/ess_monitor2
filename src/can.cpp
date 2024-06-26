@@ -28,7 +28,7 @@ uint8_t getChargeControlByte();
 DataFrame getChargeDataFrame();
 
 void begin(uint8_t core, uint8_t priority) {
-  xTaskCreatePinnedToCore(task, "can_task", 8000, NULL, priority, NULL, core);
+  xTaskCreatePinnedToCore(task, "can_task", 20000, NULL, priority, NULL, core);
 }
 
 void task(void *pvParameters) {

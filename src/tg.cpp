@@ -27,7 +27,7 @@ void onMessage(FB_msg &msg);
 String getStatusMsg();
 
 void begin(uint8_t core, uint8_t priority) {
-  xTaskCreatePinnedToCore(task, "tg_task", 8000, NULL, priority, NULL, core);
+  xTaskCreatePinnedToCore(task, "tg_task", 20000, NULL, priority, NULL, core);
 }
 
 void task(void *pvParameters) {
