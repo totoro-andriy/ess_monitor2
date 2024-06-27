@@ -38,6 +38,8 @@ void task(void *pvParameters) {
   bot.setTextMode(FB_MARKDOWN);
   bot.attach(onMessage);
 
+  vTaskDelay(1000 * 30 / portTICK_PERIOD_MS);
+
   while (1) {
     loop();
   }

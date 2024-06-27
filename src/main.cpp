@@ -24,7 +24,7 @@ void setup() {
     HASS::begin(1, 1);
   }
 
-  CAN::begin(0, 3); // TODO: wait for success for tg and hass to start
+  CAN::begin(1, 1); // TODO: wait for success for tg and hass to start
   WEB::begin(1, 1);
 
   if (Cfg.tgEnabled) {

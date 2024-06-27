@@ -96,6 +96,8 @@ void task(void *pvParameters) {
   ip.fromString(Cfg.mqttBrokerIp);
   mqtt.begin(ip);
 
+  vTaskDelay(1000 * 30 / portTICK_PERIOD_MS);
+
   while (1) {
     loop();
   }
