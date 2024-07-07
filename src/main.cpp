@@ -1,9 +1,11 @@
 #include "can.h"
 #include "hass.h"
+#include "lcd.h"
 #include "tg.h"
 #include "types.h"
 #include "web.h"
 #include <Arduino.h>
+#include <IPAddress.h>
 #include <Preferences.h>
 #include <WiFi.h>
 
@@ -21,15 +23,17 @@ void setup() {
   initConfig();
 
   if (initWiFi()) {
-    HASS::begin(1, 1);
+    if (Cfg.mqttEnabled) {
+      HASS::begin(1, 1);
+    }
+    if (Cfg.tgEnabled) {
+      TG::begin(1, 1);
+    }
   }
 
   CAN::begin(1, 1); // TODO: wait for success for tg and hass to start
   WEB::begin(1, 1);
-
-  if (Cfg.tgEnabled) {
-    TG::begin(1, 1);
-  }
+  LCD::begin(1, 1);
 }
 
 void loop() {
@@ -57,6 +61,7 @@ void initConfig() {
   Cfg.dishargeLimit =
       Pref.getUChar(CFG_INVERTER_DISCHARGE_LIMIT, Cfg.dishargeLimit);
 
+  Cfg.mqttEnabled = Pref.getBool(CFG_MQQTT_ENABLED, Cfg.mqttEnabled);
   Pref.getString(CFG_MQQTT_BROKER_IP, Cfg.mqttBrokerIp,
                  sizeof(Cfg.mqttBrokerIp));
 
@@ -75,15 +80,15 @@ bool initWiFi() {
     WiFi.begin(Cfg.wifiSSID, Cfg.wifiPass);
 
     uint32_t previousMillis = millis();
-    for (uint32_t currentMillis = millis(); currentMillis - previousMillis < 20;
-         currentMillis = millis()) {
+    for (uint32_t currentMillis = millis();
+         currentMillis - previousMillis < 20000; currentMillis = millis()) {
       delay(1000);
       Serial.print(".");
 
       if (WiFi.status() == WL_CONNECTED) {
         Serial.println(" OK.");
-        Serial.printf("IP Address: %s, mDNS hostname: '%s.local'\n",
-                      WiFi.localIP().toString(), Cfg.hostname);
+        Serial.println("IP Address: " + WiFi.localIP().toString());
+        Serial.printf("mDNS hostname: '%s.local'\n", Cfg.hostname);
         return true;
       }
     }

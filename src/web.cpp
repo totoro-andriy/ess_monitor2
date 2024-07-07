@@ -47,7 +47,7 @@ void buildPortal() {
             "temperature,state.limits",
             3000);
   GP.PAGE_TITLE(Cfg.hostname);
-  GP.NAV_TABS("ESS,WiFi,Telegram,System");
+  GP.NAV_TABS("ESS,WiFi,Telegram,MQTT,System");
   // Status tab
   GP.NAV_BLOCK_BEGIN();
   GP.GRID_BEGIN();
@@ -111,6 +111,19 @@ void buildPortal() {
   GP.SUBMIT("Save and reboot");
   GP.FORM_END();
   GP.NAV_BLOCK_END();
+  // MQTT
+  GP.NAV_BLOCK_BEGIN();
+  GP.FORM_BEGIN("/mqtt");
+  GP.BOX_BEGIN();
+  GP.SWITCH("mqtt.enabled", Cfg.mqttEnabled);
+  GP.LABEL("Enable MQTT");
+  GP.BOX_END();
+  GP.LABEL("Broker IP address");
+  GP.TEXT("mqtt.broker_ip", "", Cfg.mqttBrokerIp, "", sizeof(Cfg.mqttBrokerIp));
+  GP.BREAK();
+  GP.SUBMIT("Save and reboot");
+  GP.FORM_END();
+  GP.NAV_BLOCK_END();
   // System tab
   GP.NAV_BLOCK_BEGIN();
   GP.SYSTEM_INFO();
@@ -161,6 +174,16 @@ void onPortalUpdate() {
       Pref.putBool(CFG_TG_ENABLED, Cfg.tgEnabled);
       Pref.putString(CFG_TG_BOT_TOKEN, Cfg.tgBotToken);
       Pref.putString(CFG_TG_CHAT_ID, Cfg.tgChatID);
+
+      Pref.end();
+      esp_restart();
+    } else if (portal.form("/mqtt")) {
+      portal.copyBool("mqtt.enabled", Cfg.mqttEnabled);
+      portal.copyStr("mqtt.broker_ip", Cfg.mqttBrokerIp,
+                     sizeof(Cfg.mqttBrokerIp));
+
+      Pref.putBool(CFG_MQQTT_ENABLED, Cfg.mqttEnabled);
+      Pref.putString(CFG_MQQTT_BROKER_IP, Cfg.mqttBrokerIp);
 
       Pref.end();
       esp_restart();

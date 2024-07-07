@@ -77,7 +77,7 @@ void readCAN() {
 
   DataFrame f = {};
   can.readMsgBuf((unsigned long *)&f.id, &f.dlc, f.data);
-  logReadDataFrame(&f);
+  // logReadDataFrame(&f);
   processDataFrame(&f);
 
   // vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -120,7 +120,7 @@ void writeCAN() {
 
   // logWriteDataFrame((DataFrame *)&DF_35E);
   can.sendMsgBuf(DF_35E.id, DF_35E.dlc, (uint8_t *)DF_35E.data);
-  // logWriteDataFrame((DataFrame *)&DF_305);
+  logWriteDataFrame((DataFrame *)&DF_305);
   can.sendMsgBuf(DF_305.id, DF_305.dlc, (uint8_t *)DF_305.data);
   // logWriteDataFrame(&chargeFrame);
   can.sendMsgBuf(chargeFrame.id, chargeFrame.dlc, chargeFrame.data);

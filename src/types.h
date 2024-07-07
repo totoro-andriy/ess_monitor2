@@ -13,6 +13,7 @@
 #define CFG_HOSTNAME "hostname"
 #define CFG_INVERTER_CHARGE_LIMIT "inverter.charge_limit"
 #define CFG_INVERTER_DISCHARGE_LIMIT "inverter.discharge_limit"
+#define CFG_MQQTT_ENABLED "mqtt.enabled"
 #define CFG_MQQTT_BROKER_IP "mqtt.broker_ip"
 #define CFG_TG_ENABLED "tg.enabled"
 #define CFG_TG_BOT_TOKEN "tg.bot_token"
@@ -28,6 +29,7 @@ typedef struct Config {
   uint8_t chargeLimit = 98;
   uint8_t dishargeLimit = 10;
 
+  bool mqttEnabled = false;
   char mqttBrokerIp[16] = "192.168.0.100";
 
   bool tgEnabled = false;
