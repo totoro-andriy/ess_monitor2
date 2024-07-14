@@ -36,14 +36,16 @@ void task(void *pvParameters) {
   uint8_t mac[6];
   WiFi.macAddress(mac);
   device.setUniqueId(mac, sizeof(mac));
+  device.enableExtendedUniqueIds();
   device.setName("ESS Monitor");
-  device.setModel(Cfg.hostname);
+  device.setModel("ess-monitor");
   device.setManufacturer("Bimba Perdoling.");
   device.setSoftwareVersion(VERSION);
   char url[24];
   String("http://" + WiFi.localIP().toString()).toCharArray(url, sizeof(url));
   device.setConfigurationUrl(url);
   device.enableSharedAvailability();
+  device.enableLastWill();
 
   chargeSensor.setIcon("mdi:battery-high");
   chargeSensor.setName("Charge");
