@@ -24,7 +24,7 @@ void begin(uint8_t core, uint8_t priority) {
 
 void task(void *pvParameters) {
   Serial.printf("[WEB] Task running in core %d.\n", (uint32_t)xPortGetCoreID());
-
+  portal.enableOTA();
   portal.attachBuild(buildPortal);
   portal.attach(onPortalUpdate);
   portal.start(Cfg.hostname);
