@@ -8,12 +8,18 @@
 #include <IPAddress.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WiFiMulti.h>
+
+WiFiMulti wifiMulti;
 
 Preferences Pref;
 Config Cfg;
 volatile EssStatus Ess;
 
 void initConfig();
+
+bool wifiEverConnected = false;
+
 bool initWiFi();
 void logBatteryState();
 
@@ -39,6 +45,9 @@ void setup() {
 void loop() {
   static uint32_t previousMillis;
   uint32_t currentMillis = millis();
+
+  // WiFi reconnection
+  wifiMulti.run();
 
   // Every 5 seconds
   if (currentMillis - previousMillis >= 5000 * 1) {
@@ -72,37 +81,44 @@ void initConfig() {
 
 bool initWiFi() {
   if (Cfg.wifiSTA && Cfg.wifiSSID != NULL && Cfg.wifiSSID[0] != '\0') {
-    Serial.printf("Conecting to %s...", Cfg.wifiSSID);
+    Serial.printf("Connecting to %s...", Cfg.wifiSSID);
 
     WiFi.mode(WIFI_STA);
     WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
     WiFi.setHostname(Cfg.hostname);
-    WiFi.begin(Cfg.wifiSSID, Cfg.wifiPass);
+
+    // Reset WiFiMulti
+    wifiMulti = WiFiMulti();
+    wifiMulti.addAP(Cfg.wifiSSID, Cfg.wifiPass);
 
     uint32_t previousMillis = millis();
-    for (uint32_t currentMillis = millis();
-         currentMillis - previousMillis < 20000; currentMillis = millis()) {
-      delay(1000);
-      Serial.print(".");
-
-      if (WiFi.status() == WL_CONNECTED) {
+    while (millis() - previousMillis < 20000) {
+      if (wifiMulti.run() == WL_CONNECTED) {
         Serial.println(" OK.");
         Serial.println("IP Address: " + WiFi.localIP().toString());
         Serial.printf("mDNS hostname: '%s.local'\n", Cfg.hostname);
+        wifiEverConnected = true;
         return true;
       }
+      delay(500);
+      Serial.print(".");
     }
+
     Serial.println("Could not connect to WiFi network in 20 seconds.");
   }
 
-  Serial.println("Starting WiFi access point.");
-  IPAddress AP_IP(192, 168, 4, 1);
-  IPAddress AP_PFX(255, 255, 255, 0);
-  WiFi.disconnect();
-  WiFi.mode(WIFI_AP);
-  WiFi.softAPConfig(AP_IP, AP_IP, AP_PFX);
-  WiFi.softAP(Cfg.hostname, "12345678");
-  Serial.printf("Access point SSID: '%s'\n", Cfg.hostname);
+  if (!wifiEverConnected) {
+    Serial.println("Starting WiFi access point.");
+    IPAddress AP_IP(192, 168, 4, 1);
+    IPAddress AP_PFX(255, 255, 255, 0);
+    WiFi.disconnect();
+    WiFi.mode(WIFI_AP);
+    WiFi.softAPConfig(AP_IP, AP_IP, AP_PFX);
+    WiFi.softAP(Cfg.hostname, "12345678");
+    Serial.printf("Access point SSID: '%s'\n", Cfg.hostname);
+    return false;
+  }
+
   return false;
 }
 
