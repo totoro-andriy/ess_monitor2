@@ -107,6 +107,12 @@ void buildPortal() {
   GP.PASS("tg.bot_token", "", Cfg.tgBotToken, "", sizeof(Cfg.tgBotToken));
   GP.LABEL("Chat ID");
   GP.TEXT("tg.chat_id", "", Cfg.tgChatID, "", sizeof(Cfg.tgChatID));
+
+  GP.LABEL("Current threshold in Amps for alerts");
+  char tgCurrentbuf[6];
+  itoa(Cfg.tgCurrentThreshold, tgCurrentbuf, 10);
+  GP.TEXT("tg.current_threshold", "", tgCurrentbuf, "", sizeof(tgCurrentbuf));
+  
   GP.BREAK();
   GP.SUBMIT("Save and reboot");
   GP.FORM_END();
@@ -171,9 +177,16 @@ void onPortalUpdate() {
       portal.copyStr("tg.bot_token", Cfg.tgBotToken, sizeof(Cfg.tgBotToken));
       portal.copyStr("tg.chat_id", Cfg.tgChatID, sizeof(Cfg.tgChatID));
 
+      int thr = (int)Cfg.tgCurrentThreshold; 
+      portal.copyInt("tg.current_threshold", thr);
+      if (thr < 0)   thr = 0;
+      if (thr > 100) thr = 100;
+      Cfg.tgCurrentThreshold = (uint8_t)thr;
+
       Pref.putBool(CFG_TG_ENABLED, Cfg.tgEnabled);
       Pref.putString(CFG_TG_BOT_TOKEN, Cfg.tgBotToken);
       Pref.putString(CFG_TG_CHAT_ID, Cfg.tgChatID);
+      Pref.putUChar (CFG_TG_CURRENT_THRESHOLD, Cfg.tgCurrentThreshold);
 
       Pref.end();
       esp_restart();

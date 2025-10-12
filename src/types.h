@@ -18,6 +18,7 @@
 #define CFG_TG_ENABLED "tg.enabled"
 #define CFG_TG_BOT_TOKEN "tg.bot_token"
 #define CFG_TG_CHAT_ID "tg.chat_id"
+#define CFG_TG_CURRENT_THRESHOLD "tgCurrentThreshold"
 
 typedef struct Config {
   bool wifiSTA = false;
@@ -35,6 +36,8 @@ typedef struct Config {
   bool tgEnabled = false;
   char tgBotToken[64];
   char tgChatID[32];
+  uint8_t tgCurrentThreshold = 2;
+
 } Config;
 
 typedef struct EssStatus {
