@@ -58,12 +58,12 @@ void loop() {
   if (currentMillis - previousMillis >= 1000 * 5) {
     previousMillis = currentMillis;
 
-    if (Ess.current > 2) {
+    if (Ess.current > (int)Cfg.tgCurrentThreshold) {
       state = State::Charging;
-    } else if (Ess.current < -2) {
+    } else if (Ess.current < -(int)Cfg.tgCurrentThreshold) {
       state = State::Discharging;
     } else {
-      // Let's count current deviations in a -2..2A range as a balanced state
+      // Let's count current deviations in a tgCurrentThreshold range as a balanced state
       state = State::Balance;
     }
 

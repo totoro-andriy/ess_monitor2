@@ -133,6 +133,7 @@ void buildPortal() {
   // System tab
   GP.NAV_BLOCK_BEGIN();
   GP.SYSTEM_INFO();
+  GP.OTA_FIRMWARE();
   GP.NAV_BLOCK_END();
   GP.BUILD_END();
 }
@@ -171,7 +172,8 @@ void onPortalUpdate() {
       Pref.putString(CFG_WIFI_PASS, Cfg.wifiPass);
 
       Pref.end();
-      esp_restart();
+      backToWebRoot();
+      needRestart = true;
     } else if (portal.form("/tg")) {
       portal.copyBool("tg.enabled", Cfg.tgEnabled);
       portal.copyStr("tg.bot_token", Cfg.tgBotToken, sizeof(Cfg.tgBotToken));
@@ -189,7 +191,8 @@ void onPortalUpdate() {
       Pref.putUChar (CFG_TG_CURRENT_THRESHOLD, Cfg.tgCurrentThreshold);
 
       Pref.end();
-      esp_restart();
+      backToWebRoot();
+      needRestart = true;
     } else if (portal.form("/mqtt")) {
       portal.copyBool("mqtt.enabled", Cfg.mqttEnabled);
       portal.copyStr("mqtt.broker_ip", Cfg.mqttBrokerIp,
@@ -199,9 +202,14 @@ void onPortalUpdate() {
       Pref.putString(CFG_MQQTT_BROKER_IP, Cfg.mqttBrokerIp);
 
       Pref.end();
-      esp_restart();
+      backToWebRoot();
+      needRestart = true;
     }
   }
+}
+
+void backToWebRoot() {
+  portal.answer(F("<meta http-equiv='refresh' content='0; url=/' />"));
 }
 
 } // namespace WEB

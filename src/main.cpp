@@ -20,6 +20,8 @@ void initConfig();
 
 bool wifiEverConnected = false;
 
+bool needRestart = false;
+
 bool initWiFi();
 void logBatteryState();
 
@@ -52,8 +54,10 @@ void loop() {
   // Every 5 seconds
   if (currentMillis - previousMillis >= 5000 * 1) {
     previousMillis = currentMillis;
-
+  
     logBatteryState();
+    //SoftReset
+    if (needRestart){ESP.restart();};
   }
 }
 
