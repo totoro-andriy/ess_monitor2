@@ -54,8 +54,9 @@ void loop() {
   // Every 5 seconds
   if (currentMillis - previousMillis >= 5000 * 1) {
     previousMillis = currentMillis;
-  
+
     logBatteryState();
+
     //SoftReset
     if (needRestart){ESP.restart();};
   }

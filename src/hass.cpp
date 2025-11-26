@@ -1,5 +1,12 @@
 #include "hass.h"
 
+namespace CAN {
+  extern uint32_t timestamp_frame351;
+  extern uint32_t timestamp_frame355;
+  extern uint32_t timestamp_frame356;
+  extern uint32_t timestamp_frame359;
+}
+
 extern Config Cfg;
 extern volatile EssStatus Ess;
 
@@ -20,6 +27,8 @@ HASensorNumber ratedDischargeCurrentSensor("rated_discharge_current",
 HASensorNumber temperatureSensor("temperature", HASensorNumber::PrecisionP1);
 HASensor bmsWarningSensor("bms_warning");
 HASensor bmsErrorSensor("bms_error");
+
+static const uint16_t EXPIRE_AFTER = BATTERY_TIMEOUT_SEC;
 
 void begin(uint8_t core, uint8_t priority);
 void task(void *pvParameters);
@@ -51,48 +60,58 @@ void task(void *pvParameters) {
   chargeSensor.setName("Charge");
   chargeSensor.setDeviceClass("battery");
   chargeSensor.setUnitOfMeasurement("%");
+  chargeSensor.setExpireAfter(EXPIRE_AFTER);
 
   healthSensor.setIcon("mdi:heart");
   healthSensor.setName("Health");
   healthSensor.setUnitOfMeasurement("%");
+  healthSensor.setExpireAfter(EXPIRE_AFTER);
 
   voltageSensor.setIcon("mdi:flash-triangle-outline");
   voltageSensor.setName("Voltage");
   voltageSensor.setDeviceClass("voltage");
   voltageSensor.setUnitOfMeasurement("V");
+  voltageSensor.setExpireAfter(EXPIRE_AFTER);
 
   ratedVoltageSensor.setIcon("mdi:flash-triangle");
   ratedVoltageSensor.setName("Rated voltage");
   ratedVoltageSensor.setDeviceClass("voltage");
   ratedVoltageSensor.setUnitOfMeasurement("V");
+  ratedVoltageSensor.setExpireAfter(EXPIRE_AFTER);
 
   currentSensor.setIcon("mdi:current-dc");
   currentSensor.setName("Current");
   currentSensor.setDeviceClass("current");
   currentSensor.setUnitOfMeasurement("A");
+  currentSensor.setExpireAfter(EXPIRE_AFTER);
 
   ratedChargeCurrentSensor.setIcon("mdi:current-dc");
   ratedChargeCurrentSensor.setName("Rated charge current");
   ratedChargeCurrentSensor.setDeviceClass("current");
   ratedChargeCurrentSensor.setUnitOfMeasurement("A");
+  ratedChargeCurrentSensor.setExpireAfter(EXPIRE_AFTER);
 
   ratedDischargeCurrentSensor.setIcon("mdi:current-dc");
   ratedDischargeCurrentSensor.setName("Rated discharge current");
   ratedDischargeCurrentSensor.setDeviceClass("current");
   ratedDischargeCurrentSensor.setUnitOfMeasurement("A");
+  ratedDischargeCurrentSensor.setExpireAfter(EXPIRE_AFTER);
 
   temperatureSensor.setIcon("mdi:thermometer");
   temperatureSensor.setName("Temperature");
   temperatureSensor.setDeviceClass("temperature");
   temperatureSensor.setUnitOfMeasurement("°C");
+  temperatureSensor.setExpireAfter(EXPIRE_AFTER);
 
   bmsWarningSensor.setIcon("mdi:alert");
   bmsWarningSensor.setDeviceClass("enum");
   bmsWarningSensor.setName("BMS warning");
+  bmsWarningSensor.setExpireAfter(EXPIRE_AFTER);
 
   bmsErrorSensor.setIcon("mdi:alert-octagon");
   bmsErrorSensor.setDeviceClass("enum");
   bmsErrorSensor.setName("BMS error");
+  bmsErrorSensor.setExpireAfter(EXPIRE_AFTER);
 
   IPAddress ip;
   ip.fromString(Cfg.mqttBrokerIp);
@@ -112,6 +131,12 @@ void loop() {
   static uint32_t previousMillis;
   uint32_t currentMillis = millis();
 
+  // буфер останніх опублікованих таймстампів по кожному типу кадру
+  static uint32_t lastPublished351 = 0;
+  static uint32_t lastPublished355 = 0;
+  static uint32_t lastPublished356 = 0;
+  static uint32_t lastPublished359 = 0;
+
   // Every 5 seconds
   if (currentMillis - previousMillis >= 1000 * 5) {
     previousMillis = currentMillis;
@@ -122,18 +147,65 @@ void loop() {
 
     char buf[4];
 
-    chargeSensor.setValue(Ess.charge);
-    healthSensor.setValue(Ess.health);
-    voltageSensor.setValue(Ess.voltage);
-    ratedVoltageSensor.setValue(Ess.ratedVoltage);
-    currentSensor.setValue(Ess.current);
-    ratedChargeCurrentSensor.setValue(Ess.ratedChargeCurrent);
-    ratedDischargeCurrentSensor.setValue(Ess.ratedDischargeCurrent);
-    temperatureSensor.setValue(Ess.temperature);
-    sprintf(buf, "%d", Ess.bmsWarning);
-    bmsWarningSensor.setValue(buf);
-    sprintf(buf, "%d", Ess.bmsError);
-    bmsErrorSensor.setValue(buf);
+    // 0x351 — Battery Limits (ratedVoltage, ratedChargeCurrent, ratedDischargeCurrent)
+    if (CAN::timestamp_frame351 != 0 &&
+        CAN::timestamp_frame351 != lastPublished351) {
+
+#ifdef DEBUG
+      Serial.println("[HASS] New 0x351 frame — updating rated voltage/current sensors.");
+#endif
+
+      ratedVoltageSensor.setValue(Ess.ratedVoltage);
+      ratedChargeCurrentSensor.setValue(Ess.ratedChargeCurrent);
+      ratedDischargeCurrentSensor.setValue(Ess.ratedDischargeCurrent);
+
+      lastPublished351 = CAN::timestamp_frame351;
+    }
+
+    // 0x355 — Battery Health (charge, health)
+    if (CAN::timestamp_frame355 != 0 &&
+        CAN::timestamp_frame355 != lastPublished355) {
+
+#ifdef DEBUG
+      Serial.println("[HASS] New 0x355 frame — updating charge/health sensors.");
+#endif
+
+      chargeSensor.setValue(Ess.charge);
+      healthSensor.setValue(Ess.health);
+
+      lastPublished355 = CAN::timestamp_frame355;
+    }
+
+    // 0x356 — Voltage, Current, Temp
+    if (CAN::timestamp_frame356 != 0 &&
+        CAN::timestamp_frame356 != lastPublished356) {
+
+#ifdef DEBUG
+      Serial.println("[HASS] New 0x356 frame — updating voltage/current/temperature sensors.");
+#endif
+
+      voltageSensor.setValue(Ess.voltage);
+      currentSensor.setValue(Ess.current);
+      temperatureSensor.setValue(Ess.temperature);
+
+      lastPublished356 = CAN::timestamp_frame356;
+    }
+
+    // 0x359 — BMS Error/Warning
+    if (CAN::timestamp_frame359 != 0 &&
+        CAN::timestamp_frame359 != lastPublished359) {
+
+#ifdef DEBUG
+      Serial.println("[HASS] New 0x359 frame — updating BMS warning/error sensors.");
+#endif
+
+      sprintf(buf, "%d", Ess.bmsWarning);
+      bmsWarningSensor.setValue(buf);
+      sprintf(buf, "%d", Ess.bmsError);
+      bmsErrorSensor.setValue(buf);
+
+      lastPublished359 = CAN::timestamp_frame359;
+    }
   }
 
   mqtt.loop();

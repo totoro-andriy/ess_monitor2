@@ -133,7 +133,7 @@ void buildPortal() {
   // System tab
   GP.NAV_BLOCK_BEGIN();
   GP.SYSTEM_INFO();
-  GP.OTA_FIRMWARE();
+  //GP.OTA_FIRMWARE();
   GP.NAV_BLOCK_END();
   GP.BUILD_END();
 }

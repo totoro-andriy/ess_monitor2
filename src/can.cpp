@@ -11,6 +11,11 @@ extern volatile EssStatus Ess;
 
 namespace CAN {
 
+uint32_t timestamp_frame351=0;
+uint32_t timestamp_frame355=0;
+uint32_t timestamp_frame356=0;
+uint32_t timestamp_frame359=0;
+
 MCP_CAN can(CS_PIN);
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
 
@@ -153,19 +158,23 @@ void processDataFrame(DataFrame *f) {
     Ess.ratedVoltage = bytesToInt16(f->data[0], f->data[1]) / 10.0;
     Ess.ratedChargeCurrent = bytesToInt16(f->data[2], f->data[3]) / 10.0;
     Ess.ratedDischargeCurrent = bytesToInt16(f->data[4], f->data[5]) / 10.0;
+    timestamp_frame351 = millis();
     break;
   case 853: // 0x355 Battery Health
     Ess.charge = bytesToInt16(f->data[0], f->data[1]);
     Ess.health = bytesToInt16(f->data[2], f->data[3]);
+    timestamp_frame355 = millis();
     break;
   case 854: // 0x356 System Voltage, Current, Temp
     Ess.voltage = bytesToInt16(f->data[0], f->data[1]) / 100.0;
     Ess.current = bytesToInt16(f->data[2], f->data[3]) / 10.0;
     Ess.temperature = bytesToInt16(f->data[4], f->data[5]) / 10.0;
+    timestamp_frame356 = millis();
     break;
   case 857: // 0x359 BMS Error
     Ess.bmsWarning = f->data[1];
     Ess.bmsError = f->data[3];
+    timestamp_frame359 = millis();
     break;
   }
   portEXIT_CRITICAL(&stateMux);
