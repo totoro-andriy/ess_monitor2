@@ -16,7 +16,7 @@
 #define CFG_TG_CHAT_ID "tg.chat_id"
 #define CFG_TG_CURRENT_THRESHOLD "tg.amps"
 
-#define BATTERY_TIMEOUT_SEC 60
+#define BATTERY_TIMEOUT_SEC 300
 
 extern bool needRestart;
 

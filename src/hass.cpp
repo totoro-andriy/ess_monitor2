@@ -1,10 +1,10 @@
 #include "hass.h"
 
 namespace CAN {
-  extern uint32_t timestamp_frame351;
-  extern uint32_t timestamp_frame355;
-  extern uint32_t timestamp_frame356;
-  extern uint32_t timestamp_frame359;
+  extern volatile uint32_t timestamp_frame351;
+  extern volatile uint32_t timestamp_frame355;
+  extern volatile uint32_t timestamp_frame356;
+  extern volatile uint32_t timestamp_frame359;
 }
 
 extern Config Cfg;

@@ -11,10 +11,10 @@ extern volatile EssStatus Ess;
 
 namespace CAN {
 
-uint32_t timestamp_frame351=0;
-uint32_t timestamp_frame355=0;
-uint32_t timestamp_frame356=0;
-uint32_t timestamp_frame359=0;
+volatile uint32_t timestamp_frame351=0;
+volatile uint32_t timestamp_frame355=0;
+volatile uint32_t timestamp_frame356=0;
+volatile uint32_t timestamp_frame359=0;
 
 MCP_CAN can(CS_PIN);
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
