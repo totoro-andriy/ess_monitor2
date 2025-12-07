@@ -18,6 +18,12 @@
 
 #define BATTERY_TIMEOUT_SEC 300
 
+#include <esp_timer.h>
+
+inline uint64_t getSystemUptimeSeconds() {
+    return esp_timer_get_time() / 1000000ULL;
+}
+
 extern bool needRestart;
 
 typedef struct Config {

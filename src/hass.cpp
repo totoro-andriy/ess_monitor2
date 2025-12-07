@@ -28,6 +28,8 @@ HASensorNumber temperatureSensor("temperature", HASensorNumber::PrecisionP1);
 HASensor bmsWarningSensor("bms_warning");
 HASensor bmsErrorSensor("bms_error");
 
+HASensorNumber uptimeSensor("uptime", HASensorNumber::PrecisionP0);
+
 static const uint16_t EXPIRE_AFTER = BATTERY_TIMEOUT_SEC;
 
 void begin(uint8_t core, uint8_t priority);
@@ -113,6 +115,11 @@ void task(void *pvParameters) {
   bmsErrorSensor.setName("BMS error");
   bmsErrorSensor.setExpireAfter(EXPIRE_AFTER);
 
+  uptimeSensor.setIcon("mdi:timer-outline");
+  uptimeSensor.setName("Controller uptime");
+  uptimeSensor.setUnitOfMeasurement("s");
+  uptimeSensor.setExpireAfter(EXPIRE_AFTER);
+
   IPAddress ip;
   ip.fromString(Cfg.mqttBrokerIp);
   mqtt.begin(ip);
@@ -121,6 +128,7 @@ void task(void *pvParameters) {
 
   while (1) {
     loop();
+    vTaskDelay(5);
   }
 
   Serial.println("[HASS] Task exited.");
@@ -155,9 +163,9 @@ void loop() {
       Serial.println("[HASS] New 0x351 frame — updating rated voltage/current sensors.");
 #endif
 
-      ratedVoltageSensor.setValue(Ess.ratedVoltage);
-      ratedChargeCurrentSensor.setValue(Ess.ratedChargeCurrent);
-      ratedDischargeCurrentSensor.setValue(Ess.ratedDischargeCurrent);
+      ratedVoltageSensor.setValue(Ess.ratedVoltage, true);
+      ratedChargeCurrentSensor.setValue(Ess.ratedChargeCurrent, true);
+      ratedDischargeCurrentSensor.setValue(Ess.ratedDischargeCurrent, true);
 
       lastPublished351 = CAN::timestamp_frame351;
     }
@@ -170,8 +178,8 @@ void loop() {
       Serial.println("[HASS] New 0x355 frame — updating charge/health sensors.");
 #endif
 
-      chargeSensor.setValue(Ess.charge);
-      healthSensor.setValue(Ess.health);
+      chargeSensor.setValue(Ess.charge, true);
+      healthSensor.setValue(Ess.health, true);
 
       lastPublished355 = CAN::timestamp_frame355;
     }
@@ -184,9 +192,9 @@ void loop() {
       Serial.println("[HASS] New 0x356 frame — updating voltage/current/temperature sensors.");
 #endif
 
-      voltageSensor.setValue(Ess.voltage);
-      currentSensor.setValue(Ess.current);
-      temperatureSensor.setValue(Ess.temperature);
+      voltageSensor.setValue(Ess.voltage, true);
+      currentSensor.setValue(Ess.current, true);
+      temperatureSensor.setValue(Ess.temperature, true);
 
       lastPublished356 = CAN::timestamp_frame356;
     }
@@ -206,6 +214,11 @@ void loop() {
 
       lastPublished359 = CAN::timestamp_frame359;
     }
+
+    // esp32 uptime
+    uint64_t uptimeSec64 = getSystemUptimeSeconds();
+    uptimeSensor.setValue((uint32_t)uptimeSec64, true);
+
   }
 
   mqtt.loop();

@@ -4,6 +4,8 @@
 #include <HardwareSerial.h>
 #include <Preferences.h>
 
+#include <esp_timer.h>
+
 extern Config Cfg;
 extern Preferences Pref;
 extern volatile EssStatus Ess;
@@ -11,6 +13,141 @@ extern volatile EssStatus Ess;
 namespace WEB {
 
 GyverPortal portal;
+
+static String formatUptimeDHMS() {
+    uint64_t sec = getSystemUptimeSeconds();
+    uint8_t second = sec % 60ULL;
+    sec /= 60ULL;
+    uint8_t minute = sec % 60ULL;
+    sec /= 60ULL;
+    uint16_t hour = sec % 24ULL;
+    sec /= 24ULL;
+    String s;
+    s.reserve(16);
+    s += (uint32_t)sec;
+    s += ':';
+    if (hour < 10) s += '0';
+    s += hour;
+    s += ':';
+    if (minute < 10) s += '0';
+    s += minute;
+    s += ':';
+    if (second < 10) s += '0';
+    s += second;
+
+    return s;
+}
+
+static void buildSystemInfo(const String& fwv = "", const String& w = "") {
+    GP.TABLE_BEGIN(w);
+    // =========== Network ===========
+    GP.TR();
+    GP.TD(GP_CENTER, 3);
+    GP.LABEL(F("Network"));
+    GP.HR();
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("WiFi Mode"));
+    GP.TD(GP_RIGHT); GP.SEND(
+        WiFi.getMode() == WIFI_AP  ? F("AP") :
+        (WiFi.getMode() == WIFI_STA ? F("STA") : F("AP_STA"))
+    );
+
+    if (WiFi.getMode() != WIFI_AP) {
+        GP.TR();
+        GP.TD(GP_LEFT);  GP.BOLD(F("SSID"));
+        GP.TD(GP_RIGHT); GP.SEND(WiFi.SSID());
+
+        GP.TR();
+        GP.TD(GP_LEFT);  GP.BOLD(F("Local IP"));
+        GP.TD(GP_RIGHT); GP.SEND(WiFi.localIP().toString());
+    }
+    if (WiFi.getMode() != WIFI_STA) {
+        GP.TR();
+        GP.TD(GP_LEFT);  GP.BOLD(F("AP IP"));
+        GP.TD(GP_RIGHT); GP.SEND(WiFi.softAPIP().toString());
+    }
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Subnet"));
+    GP.TD(GP_RIGHT); GP.SEND(WiFi.subnetMask().toString());
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Gateway"));
+    GP.TD(GP_RIGHT); GP.SEND(WiFi.gatewayIP().toString());
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("MAC Address"));
+    GP.TD(GP_RIGHT); GP.SEND(WiFi.macAddress());
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("RSSI"));
+    GP.TD(GP_RIGHT); GP.SEND(
+        "📶 " + String(constrain(2 * (WiFi.RSSI() + 100), 0, 100)) + '%'
+    );
+
+    // =========== Memory ===========
+    GP.TR();
+    GP.TD(GP_CENTER, 3);
+    GP.LABEL(F("Memory"));
+    GP.HR();
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Free Heap"));
+    GP.TD(GP_RIGHT); GP.SEND(String(ESP.getFreeHeap() / 1000.0, 3) + " kB");
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Sketch Size (Free)"));
+    GP.TD(GP_RIGHT); GP.SEND(
+        String(ESP.getSketchSize() / 1000.0, 1) + " kB (" +
+        String(ESP.getFreeSketchSpace() / 1000.0, 1) + ")"
+    );
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Flash Size"));
+    GP.TD(GP_RIGHT); GP.SEND(String(ESP.getFlashChipSize() / 1000.0, 1) + " kB");
+
+    // =========== System ===========
+    GP.TR();
+    GP.TD(GP_CENTER, 3);
+    GP.LABEL(F("System"));
+    GP.HR();
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Cycle Count"));
+    GP.TD(GP_RIGHT); GP.SEND(String(ESP.getCycleCount()));
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Cpu Freq."));
+    GP.TD(GP_RIGHT); GP.SEND(String(ESP.getCpuFreqMHz()) + F(" MHz"));
+
+    // ======= UPTIME (esp_timer_get_time) =======
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("Uptime"));
+    GP.TD(GP_RIGHT); GP.SEND(formatUptimeDHMS());
+
+    // =========== Version ===========
+    GP.TR();
+    GP.TD(GP_CENTER, 3);
+    GP.LABEL(F("Version"));
+    GP.HR();
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("SDK"));
+    GP.TD(GP_RIGHT); GP.SEND(ESP.getSdkVersion());
+
+    GP.TR();
+    GP.TD(GP_LEFT);  GP.BOLD(F("GyverPortal"));
+    GP.TD(GP_RIGHT); GP.SEND(GP_VERSION);
+
+    if (fwv.length()) {
+        GP.TR();
+        GP.TD(GP_LEFT);  GP.BOLD(F("Firmware"));
+        GP.TD(GP_RIGHT); GP.SEND(fwv);
+    }
+
+    GP.TABLE_END();
+}
 
 void begin(uint8_t core, uint8_t priority);
 void task(void *pvParameters);
@@ -132,8 +269,9 @@ void buildPortal() {
   GP.NAV_BLOCK_END();
   // System tab
   GP.NAV_BLOCK_BEGIN();
-  GP.SYSTEM_INFO();
-  //GP.OTA_FIRMWARE();
+
+  buildSystemInfo(VERSION);
+
   GP.NAV_BLOCK_END();
   GP.BUILD_END();
 }

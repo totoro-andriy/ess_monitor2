@@ -16,8 +16,14 @@ volatile uint32_t timestamp_frame355=0;
 volatile uint32_t timestamp_frame356=0;
 volatile uint32_t timestamp_frame359=0;
 
+static uint32_t last305OkMs = 0;
+static const uint32_t WD_TIMEOUT_MS = 5UL * 60UL * 1000UL; // 5 хвилин
+
 MCP_CAN can(CS_PIN);
 portMUX_TYPE stateMux = portMUX_INITIALIZER_UNLOCKED;
+
+TaskHandle_t canTaskHandle = nullptr;
+void IRAM_ATTR onCanInt();
 
 void begin(uint8_t core, uint8_t priority);
 void task(void *pvParameters);
@@ -26,34 +32,40 @@ bool initCAN();
 void readCAN();
 void writeCAN();
 void logReadDataFrame(DataFrame *f);
-void logWriteDataFrame(DataFrame *f);
+// void logWriteDataFrame(DataFrame *f);
 int16_t bytesToInt16(uint8_t low, uint8_t high);
 void processDataFrame(DataFrame *f);
 uint8_t getChargeControlByte();
 DataFrame getChargeDataFrame();
 
-void begin(uint8_t core, uint8_t priority) {
-  xTaskCreatePinnedToCore(task, "can_task", 20000, NULL, priority, NULL, core);
-}
+bool sendFrameChecked(const DataFrame &f) {
+  const uint8_t maxRetries = 3;
 
-void task(void *pvParameters) {
-  Serial.printf("[CAN] Task running in core %d.\n", (uint32_t)xPortGetCoreID());
-
-  if (initCAN()) {
-    while (1) {
-      loop();
+  for (uint8_t i = 0; i < maxRetries; i++) {
+    byte rc = can.sendMsgBuf(f.id, f.dlc, (uint8_t *)f.data);
+    if (rc == CAN_OK) {
+      return true;
     }
+    vTaskDelay(pdMS_TO_TICKS(1));
   }
 
-  Serial.println("[CAN] Task exited.");
-  vTaskDelete(NULL);
-};
+#ifdef DEBUG
+  Serial.printf("[CAN] ERROR: sendMsgBuf(0x%03X) failed after %u retries\n",
+                f.id, maxRetries);
+#endif
+  return false;
+}
+
+void begin(uint8_t core, uint8_t priority) {
+  xTaskCreatePinnedToCore(task, "can_task", 20000,
+                          NULL, priority, &canTaskHandle, core);
+}
 
 bool initCAN() {
   if (can.begin(MCP_ANY, CAN_500KBPS, MCP_8MHZ) == CAN_OK) {
     can.setMode(MCP_NORMAL);
-    attachInterrupt(INT_PIN, readCAN, LOW);
-    pinMode(INT_PIN, INPUT);
+    pinMode(INT_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(INT_PIN), CAN::onCanInt, FALLING);
     Serial.println(F("[CAN] Initializing MCP2515... OK."));
     return true;
   }
@@ -61,92 +73,103 @@ bool initCAN() {
   return false;
 }
 
-void loop() {
-  static uint32_t previousMillis;
-  uint32_t currentMillis = millis();
-
-  readCAN();
-
-  // Every 1 second
-  if (currentMillis - previousMillis >= 1000 * 1) {
-    previousMillis = currentMillis;
-    writeCAN();
-  }
-}
-
-void readCAN() {
-  if (digitalRead(INT_PIN)) {
-    // INT_PIN high state means there is nothing to read
+void IRAM_ATTR onCanInt() {
+  if (canTaskHandle == nullptr) {
     return;
   }
 
-  DataFrame f = {};
-  can.readMsgBuf((unsigned long *)&f.id, &f.dlc, f.data);
-  // logReadDataFrame(&f);
-  processDataFrame(&f);
-
-  // vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-  // // Charge/health
-  // DataFrame f = {.id = 0x355, .dlc = 8, .data = {98, 0, 94, 0}};
-  // logReadDataFrame(&f);
-  // processDataFrame(&f);
-
-  // // Battery limits
-  // DataFrame f2 = {.id = 0x351,
-  //                 .dlc = 8,
-  //                 .data = {0x46, 0x02, 0x54, 0x01, 0xEC, 0x04, 0, 0}};
-
-  // logReadDataFrame(&f2);
-  // processDataFrame(&f2);
-
-  // // Voltage, Current, Temp
-  // uint32_t m = millis();
-  // if (m < 30000) {
-  //   DataFrame f3 = {
-  //       .id = 0x356, .dlc = 8, .data = {0x8A, 0x16, 0x05, 0x00, 0xFD}};
-  //   logReadDataFrame(&f3);
-  //   processDataFrame(&f3);
-  // } else if (m < 60000) {
-  //   DataFrame f3 = {
-  //       .id = 0x356, .dlc = 8, .data = {0x8A, 0x16, 0x32, 0x00, 0xFD}};
-  //   logReadDataFrame(&f3);
-  //   processDataFrame(&f3);
-  // } else {
-  //   DataFrame f3 = {
-  //       .id = 0x356, .dlc = 8, .data = {0x8A, 0x16, 0xA4, 0xFF, 0xFD}};
-  //   logReadDataFrame(&f3);
-  //   processDataFrame(&f3);
-  // }
+  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+  vTaskNotifyGiveFromISR(canTaskHandle, &xHigherPriorityTaskWoken);
+  if (xHigherPriorityTaskWoken == pdTRUE) {
+    portYIELD_FROM_ISR();
+  }
 }
+
+void task(void *pvParameters) {
+  Serial.printf("[CAN] Task running in core %d.\n", (uint32_t)xPortGetCoreID());
+
+  if (!initCAN()) {
+    Serial.println("[CAN] Task exited due to init error.");
+    vTaskDelete(NULL);
+    return;
+  }
+
+  uint32_t previousWriteMillis = millis();
+
+  while (1) {
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10));
+    readCAN();
+    uint32_t now = millis();
+    if (now - previousWriteMillis >= 1000) {
+      previousWriteMillis = now;
+      writeCAN();
+    }
+  }
+
+  Serial.println("[CAN] Task exited.");
+  vTaskDelete(NULL);
+}
+
+void loop() {
+  
+}
+
+void readCAN() {
+  DataFrame f = {};
+
+  while (can.checkReceive() == CAN_MSGAVAIL) {
+    if (can.readMsgBuf((unsigned long *)&f.id, &f.dlc, f.data) == CAN_OK) {
+      processDataFrame(&f);
+    } else {
+      break;
+    }
+  }
+}
+
+// void writeCAN() {
+// DataFrame chargeFrame = getChargeDataFrame();
+
+// // logWriteDataFrame((DataFrame *)&DF_35E);
+// can.sendMsgBuf(DF_35E.id, DF_35E.dlc, (uint8_t *)DF_35E.data);
+// logWriteDataFrame((DataFrame *)&DF_305);
+// can.sendMsgBuf(DF_305.id, DF_305.dlc, (uint8_t *)DF_305.data);
+// // logWriteDataFrame(&chargeFrame);
+// can.sendMsgBuf(chargeFrame.id, chargeFrame.dlc, chargeFrame.data);
+// }
+
+// void logReadDataFrame(DataFrame *f) {
+// #ifdef DEBUG
+// Serial.printf("[CAN] Frame received:\t <- ID: %04x DLC: %d Data: "
+//               "%02x %02x %02x %02x %02x %02x %02x %02x\n",
+//               f->id, f->dlc, f->data[0], f->data[1], f->data[2], f->data[3],
+//               f->data[4], f->data[5], f->data[6], f->data[7]);
+// #endif
+// }
+
+// void logWriteDataFrame(DataFrame *f) {
+// #ifdef DEBUG
+//   Serial.printf("[CAN] Frame sent:\t -> ID: %04x DLC: %d Data: "
+//                 "%02x %02x %02x %02x %02x %02x %02x %02x\n",
+//                 f->id, f->dlc, f->data[0], f->data[1], f->data[2], f->data[3],
+//                 f->data[4], f->data[5], f->data[6], f->data[7]);
+// #endif
+// }
 
 void writeCAN() {
   DataFrame chargeFrame = getChargeDataFrame();
-
-  // logWriteDataFrame((DataFrame *)&DF_35E);
-  can.sendMsgBuf(DF_35E.id, DF_35E.dlc, (uint8_t *)DF_35E.data);
-  logWriteDataFrame((DataFrame *)&DF_305);
-  can.sendMsgBuf(DF_305.id, DF_305.dlc, (uint8_t *)DF_305.data);
-  // logWriteDataFrame(&chargeFrame);
-  can.sendMsgBuf(chargeFrame.id, chargeFrame.dlc, chargeFrame.data);
-}
-
-void logReadDataFrame(DataFrame *f) {
-#ifdef DEBUG
-  Serial.printf("[CAN] Frame received:\t <- ID: %04x DLC: %d Data: "
-                "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-                f->id, f->dlc, f->data[0], f->data[1], f->data[2], f->data[3],
-                f->data[4], f->data[5], f->data[6], f->data[7]);
-#endif
-}
-
-void logWriteDataFrame(DataFrame *f) {
-#ifdef DEBUG
-  Serial.printf("[CAN] Frame sent:\t -> ID: %04x DLC: %d Data: "
-                "%02x %02x %02x %02x %02x %02x %02x %02x\n",
-                f->id, f->dlc, f->data[0], f->data[1], f->data[2], f->data[3],
-                f->data[4], f->data[5], f->data[6], f->data[7]);
-#endif
+  (void)sendFrameChecked(DF_35E);
+  if (sendFrameChecked(DF_305)) {
+    last305OkMs = millis();
+  } else {
+  #ifdef DEBUG
+    Serial.println("[CAN] WARNING: 0x305 send failed");
+  #endif
+  }
+  if (last305OkMs != 0 && (millis() - last305OkMs > WD_TIMEOUT_MS)) {
+    Serial.println("[CAN] ERROR: No successful 0x305 for 5 minutes — restarting ESP!");
+    ESP.restart();
+  }
+  (void)sendFrameChecked(chargeFrame);
 }
 
 int16_t bytesToInt16(uint8_t low, uint8_t high) { return (high << 8) | low; }

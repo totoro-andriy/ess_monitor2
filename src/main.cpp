@@ -10,6 +10,7 @@
 #include <WiFi.h>
 #include <WiFiMulti.h>
 
+
 WiFiMulti wifiMulti;
 
 Preferences Pref;
@@ -39,7 +40,7 @@ void setup() {
     }
   }
 
-  CAN::begin(1, 1); // TODO: wait for success for tg and hass to start
+  CAN::begin(1, 3); // TODO: wait for success for tg and hass to start
   WEB::begin(1, 1);
   LCD::begin(1, 1);
 }
